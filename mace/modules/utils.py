@@ -248,3 +248,19 @@ def compute_rms_dipoles(
     dipoles = torch.cat(dipoles_list, dim=0)  # {[total_n_graphs,3], }
     rms = to_numpy(torch.sqrt(torch.mean(torch.square(dipoles)))).item()
     return rms
+
+def get_long_fully_connected_graph(
+    batch: torch.Tensor, num_graphs: int,  # [N_atoms,]
+):
+    _, counts = torch.unique(batch, return_counts=True)
+    start = 0
+    edge_index = []
+    for i in range(num_graphs):
+        ind = torch.linspace(
+            start, float(counts[i]) + start - 1, steps=counts[i], dtype=torch.int64
+        )
+        comb = torch.combinations(ind, r=2)
+        edge_index.append(torch.cat((comb, torch.flip(comb, dims=[0, 1])), dim=0))
+        start += counts[i]
+    return (torch.cat(edge_index, dim=0).T).to(batch.device)
+    

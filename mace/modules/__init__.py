@@ -19,6 +19,10 @@ from .blocks import (
     RealAgnosticResidualInteractionBlock,
     ResidualElementDependentInteractionBlock,
     ScaleShiftBlock,
+    E_Gauss_qq,
+    E_soft_q_mu,
+    E_soft_mu_mu,
+    ElectrostaticEnergyBlock,
 )
 from .loss import (
     DipoleSingleLoss,
@@ -44,6 +48,7 @@ from .utils import (
     compute_mean_rms_energy_forces,
     compute_mean_std_atomic_inter_energy,
     compute_rms_dipoles,
+    get_long_fully_connected_graph,
 )
 
 interaction_classes: Dict[str, Type[InteractionBlock]] = {
@@ -98,4 +103,9 @@ __all__ = [
     "interaction_classes",
     "compute_mean_std_atomic_inter_energy",
     "compute_avg_num_neighbors",
+    "E_Gauss_qq",
+    "E_soft_q_mu",
+    "E_soft_mu_mu",
+    "ElectrostaticEnergyBlock",
+    "get_long_fully_connected_graph"
 ]

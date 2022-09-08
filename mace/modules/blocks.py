@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple, Union
 import numpy as np
 import torch.nn.functional
 from e3nn import nn, o3
-from scipy.constants import c, e
+from scipy.constants import pi, c, epsilon_0, e
 
 from mace.tools.scatter import scatter_sum
 
@@ -629,3 +629,119 @@ class NonLinearDipoleReadoutBlock(torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # [n_nodes, irreps]  # [..., ]
         x = self.equivariant_nonlin(self.linear_1(x))
         return self.linear_2(x)  # [n_nodes, 1]
+
+
+class E_Gauss_qq(torch.nn.Module):
+    def __init__(self, sigma=1.4):
+        super().__init__()
+        self.alpha = 1 / (4 * sigma ** 2) ** 0.5
+
+    def forward(
+        self, d_ij: torch.Tensor, q_i_q_j: torch.Tensor,  # [N_edges,1],  # [N_edges,1]
+    ) -> torch.Tensor:
+        inv_d = torch.reciprocal(d_ij)  # [N_edges,1]
+        torch.nan_to_num(inv_d, nan=0.0, posinf=0.0, neginf=0.0)
+        coulomb = q_i_q_j * inv_d  # [N_edges,1]
+        return (
+            0.5
+            * 1 / (4 * pi * epsilon_0)
+            * coulomb
+            * torch.erf(self.alpha * d_ij)
+            * e
+            * 1e10
+        )  # [N_edges,1]
+
+
+class E_soft_q_mu(torch.nn.Module):
+    def __init__(self, lambd=0.2, alpha=6.0):
+        super().__init__()
+        self.lambd = lambd
+        self.alpha = alpha
+
+    def forward(
+        self,
+        d_ij: torch.Tensor,  # [N_edges,1]
+        R_ij_mu_j: torch.Tensor,  # [N_edges,1]
+        charge_i: torch.Tensor,  # [N_edges,1]
+    ) -> torch.Tensor:
+        inv_d = torch.reciprocal(
+            torch.pow(d_ij + (self.alpha * (1 - self.lambd) ** 2), 1.5)
+        )  # [N_edges,1]
+        torch.nan_to_num(inv_d, nan=0.0, posinf=0.0, neginf=0.0)
+        return (
+            1 / (4 * pi * epsilon_0) * R_ij_mu_j * charge_i * inv_d * (1e-1 / c)
+        )  # [N_edges,1]
+
+
+class E_soft_mu_mu(torch.nn.Module):
+    def __init__(self, lambd=0.2, alpha=6.0):
+        super().__init__()
+        self.lambd = lambd
+        self.alpha = alpha
+
+    def forward(
+        self,
+        d_ij,  # [N_edges,1]
+        mu_i_mu_j,  # [N_edges,1]
+        R_ij_mu_j,  # [N_edges,1]
+        mu_i_R_ij,  # [N_edges,1]
+    ) -> torch.Tensor:
+        inv_d = torch.reciprocal(d_ij + (self.alpha * (1 - self.lambd) ** 2))
+        torch.nan_to_num(inv_d, nan=0.0, posinf=0.0, neginf=0.0)
+        term2 = mu_i_mu_j - 3 * R_ij_mu_j * mu_i_R_ij * inv_d
+        return (
+            0.5
+            * 1 / (4 * pi * epsilon_0)
+            * torch.pow(inv_d, 1.5)
+            * term2
+            * 1e-12
+            * (1 / c) ** 2
+            / e
+        )  # [N_edges,1]
+
+
+class ElectrostaticEnergyBlock(torch.nn.Module):
+    def __init__(self, qq_sigma, mu_lambda, mu_alpha):
+        super().__init__()
+        self.E_charge_charge = E_Gauss_qq(sigma=qq_sigma)
+        self.E_charge_dipole = E_soft_q_mu(lambd=mu_lambda, alpha=mu_alpha)
+        self.E_dipole_dipole = E_soft_mu_mu(lambd=mu_lambda, alpha=mu_alpha)
+
+    def forward(
+        self,
+        charge: torch.Tensor,
+        atomic_dipoles: torch.Tensor,
+        positions: torch.Tensor,
+        edge_index_long_r: torch.Tensor,
+        num_nodes: int,
+    ) -> torch.Tensor:
+        sender, receiver = edge_index_long_r
+        R_ij = positions[sender] - positions[receiver]  # [N_edges,3]
+        d_ij = torch.norm(R_ij, dim=-1, keepdim=True)  # [N_edges,1]
+        R_ij_mu_j = torch.sum(
+            R_ij * atomic_dipoles[sender], dim=-1, keepdim=True
+        )  # [N_edges,1]
+        mu_i_R_ij = -1 * torch.sum(
+            R_ij * atomic_dipoles[receiver], dim=-1, keepdim=True
+        )  # [N_edges,1]
+        mu_i_mu_j = torch.sum(
+            atomic_dipoles[receiver] * atomic_dipoles[sender], dim=-1, keepdim=True
+        )  # [N_edges,1]
+        q_i_q_j = charge[receiver] * charge[sender]  # [N_edges,1]
+
+        E_qq = self.E_charge_charge(d_ij=d_ij.squeeze(-1), q_i_q_j=q_i_q_j)
+        E_q_mu = self.E_charge_dipole(
+            torch.pow(d_ij, 2), R_ij_mu_j, charge_i=charge[receiver].unsqueeze(-1)
+        )
+        E_mu_mu = self.E_dipole_dipole(
+            torch.pow(d_ij, 2), mu_i_mu_j, R_ij_mu_j, mu_i_R_ij
+        )
+        E_edges_mu = E_q_mu.squeeze(-1) + E_mu_mu.squeeze(-1) # [N_edges,]
+        
+        E_mu = scatter_sum(
+            src=E_edges_mu, index=receiver, dim=-1, dim_size=num_nodes
+        )  # [N_nodes,]
+        E_q = scatter_sum(
+            src=E_qq, index=receiver, dim=-1, dim_size=num_nodes
+        )  # [N_nodes,]
+        return E_q, E_mu

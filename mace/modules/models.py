@@ -25,12 +25,14 @@ from .blocks import (
     NonLinearReadoutBlock,
     RadialEmbeddingBlock,
     ScaleShiftBlock,
+    ElectrostaticEnergyBlock,
 )
 from .utils import (
     compute_forces,
     get_edge_vectors_and_lengths,
     get_outputs,
     get_symmetric_displacement,
+    get_long_fully_connected_graph,
 )
 
 
@@ -913,6 +915,173 @@ class EnergyDipolesMACE(torch.nn.Module):
         output = {
             "energy": total_energy,
             "contributions": contributions,
+            "forces": forces,
+            "dipole": total_dipole,
+            "atomic_dipoles": atomic_dipoles,
+        }
+
+        return output
+
+
+class ElectrostaticEnergyDipolesMACE(EnergyDipolesMACE):
+    def __init__(
+        self,
+        #atomic_inter_scale: float,
+        #atomic_inter_shift: float,
+        #dipole_scale: float,
+        #dipole_shift: float,
+        qq_sigma: float,  # smearing of charges
+        mu_lambda: float,  # smearing of dipoles 1
+        mu_alpha: float,  # smearing of dipoles 2
+        atomic_dipoles_model: Optional[AtomicDipolesMACE] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        # self.scale_shift_energy = ScaleShiftBlock(
+        #     scale=atomic_inter_scale, shift=atomic_inter_shift
+        # )
+        # self.scale_shift_dipoles = ScaleShiftBlock(
+        #     scale=dipole_scale, shift=dipole_shift
+        # )
+        self.electrostactic_energy = ElectrostaticEnergyBlock(qq_sigma=qq_sigma, mu_lambda=mu_lambda, mu_alpha=mu_alpha)
+        self.atomic_dipoles_model = atomic_dipoles_model       
+
+    def forward(
+        self,
+        data: AtomicData,
+        training=False,
+        compute_force: bool = True,
+        compute_virials: bool = False,
+        compute_stress: bool = False,
+    ) -> Dict[str, Any]:
+        # dipoles and virials / stress not supported simultaneously
+        assert compute_virials is False
+        assert compute_stress is False
+        # Setup
+        data.positions.requires_grad = True
+        if not training:
+            for p in self.parameters():
+                p.requires_grad = False
+        else:
+            for p in self.parameters():
+                p.requires_grad = True
+
+        # Atomic energies
+        node_e0 = self.atomic_energies_fn(data.node_attrs)
+        e0 = scatter_sum(
+            src=node_e0, index=data.batch, dim=-1, dim_size=data.num_graphs
+        )  # [n_graphs,]
+
+        # Embeddings
+        node_feats = self.node_embedding(data.node_attrs)
+        num_nodes = node_feats.shape[0]
+        vectors, lengths = get_edge_vectors_and_lengths(
+            positions=data.positions, edge_index=data.edge_index, shifts=data.shifts
+        )
+        edge_index_long_r = get_long_fully_connected_graph(
+            batch=data.batch, num_graphs=data.num_graphs
+        )
+        edge_attrs = self.spherical_harmonics(vectors)
+        edge_feats = self.radial_embedding(lengths)
+
+        # Interactions
+        node_es_list = []
+        dipoles = []
+        for interaction, product, readout in zip(
+            self.interactions, self.products, self.readouts
+        ):
+            node_feats, sc = interaction(
+                node_attrs=data.node_attrs,
+                node_feats=node_feats,
+                edge_attrs=edge_attrs,
+                edge_feats=edge_feats,
+                edge_index=data.edge_index,
+            )
+            node_feats = product(
+                node_feats=node_feats, sc=sc, node_attrs=data.node_attrs
+            )
+            node_out = readout(node_feats).squeeze(-1)  # [n_nodes, ]
+            node_energies = node_out[:, 0]
+            node_es_list.append(node_energies)
+            node_dipoles = node_out[:, 1:]
+            dipoles.append(node_dipoles)
+
+        # Compute the dipoles
+        if self.atomic_dipoles_model is not None:
+            out_dipole = self.atomic_dipoles_model(data, training=False)
+            atomic_dipoles = out_dipole["atomic_dipoles"]
+            total_dipole = out_dipole["dipole"]
+        else:
+            contributions_dipoles = torch.stack(
+                dipoles, dim=-1
+            )  # [n_nodes,3,n_contributions]
+            atomic_dipoles = torch.sum(contributions_dipoles, dim=-1)  # [n_nodes,3]
+            total_dipole = scatter_sum(
+                src=atomic_dipoles,
+                index=data.batch.unsqueeze(-1),
+                dim=0,
+                dim_size=data.num_graphs,
+            )  # [n_graphs,3]
+            baseline = self.dipoles_baseline(
+                charges=data.charges,
+                positions=data.positions,
+                batch=data.batch,
+                num_graphs=data.num_graphs,
+            )  # [n_graphs,3]
+            total_dipole = total_dipole + baseline
+
+        # Sum over energy contributions
+        node_inter_es = torch.sum(
+            torch.stack(node_es_list, dim=0), dim=0
+        )  # [n_nodes, ]
+        E_q, E_mu = self.electrostactic_energy(
+            atomic_dipoles=atomic_dipoles,
+            charge=data.charge,
+            positions=data.positions,
+            edge_index_long_r=edge_index_long_r,
+            num_nodes=num_nodes,
+        )  # [n_nodes,]
+        node_inter_es_electro = (
+            node_inter_es + E_mu + E_q
+        )  # [n_nodes,]
+
+        # comment out when implementing scale-shifting
+        # node_inter_es_electro = (
+        #     self.scale_shift_energy(node_inter_es + E_mu)
+        #     + E_q
+        # )  # [n_nodes,]
+
+        # Sum over nodes in graph
+        inter_e = scatter_sum(
+            src=node_inter_es_electro,
+            index=data.batch,
+            dim=-1,
+            dim_size=data.num_graphs,
+        )  # [n_graphs,]
+        electrostatic_energy = scatter_sum(
+                src=(E_mu + E_q),
+                index=data.batch,
+                dim=-1,
+                dim_size=data.num_graphs,
+                ),
+        total_energy = inter_e + e0  # [n_graphs,]
+
+        forces, _, _ = get_outputs(
+            energy=total_energy,
+            positions=data.positions,
+            displacement=None,
+            cell=data.cell,
+            training=training,
+            compute_force=compute_force,
+            compute_virials=compute_virials,
+            compute_stress=compute_stress,
+        )
+
+        output = {
+            "energy": total_energy,
+            "electrostatic_energy": electrostatic_energy,
+            "interaction_energy": inter_e,
+            "e0": e0,
             "forces": forces,
             "dipole": total_dipole,
             "atomic_dipoles": atomic_dipoles,
