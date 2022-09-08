@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple, Union
 import numpy as np
 import torch.nn.functional
 from e3nn import nn, o3
-from scipy.constants import pi, c, epsilon_0, e
+from scipy.constants import c, e, epsilon_0, pi
 
 from mace.tools.scatter import scatter_sum
 
@@ -634,17 +634,20 @@ class NonLinearDipoleReadoutBlock(torch.nn.Module):
 class E_Gauss_qq(torch.nn.Module):
     def __init__(self, sigma=1.4):
         super().__init__()
-        self.alpha = 1 / (4 * sigma ** 2) ** 0.5
+        self.alpha = 1 / (4 * sigma**2) ** 0.5
 
     def forward(
-        self, d_ij: torch.Tensor, q_i_q_j: torch.Tensor,  # [N_edges,1],  # [N_edges,1]
+        self,
+        d_ij: torch.Tensor,
+        q_i_q_j: torch.Tensor,  # [N_edges,1],  # [N_edges,1]
     ) -> torch.Tensor:
         inv_d = torch.reciprocal(d_ij)  # [N_edges,1]
         torch.nan_to_num(inv_d, nan=0.0, posinf=0.0, neginf=0.0)
         coulomb = q_i_q_j * inv_d  # [N_edges,1]
         return (
             0.5
-            * 1 / (4 * pi * epsilon_0)
+            * 1
+            / (4 * pi * epsilon_0)
             * coulomb
             * torch.erf(self.alpha * d_ij)
             * e
@@ -691,7 +694,8 @@ class E_soft_mu_mu(torch.nn.Module):
         term2 = mu_i_mu_j - 3 * R_ij_mu_j * mu_i_R_ij * inv_d
         return (
             0.5
-            * 1 / (4 * pi * epsilon_0)
+            * 1
+            / (4 * pi * epsilon_0)
             * torch.pow(inv_d, 1.5)
             * term2
             * 1e-12
@@ -736,8 +740,8 @@ class ElectrostaticEnergyBlock(torch.nn.Module):
         E_mu_mu = self.E_dipole_dipole(
             torch.pow(d_ij, 2), mu_i_mu_j, R_ij_mu_j, mu_i_R_ij
         )
-        E_edges_mu = E_q_mu.squeeze(-1) + E_mu_mu.squeeze(-1) # [N_edges,]
-        
+        E_edges_mu = E_q_mu.squeeze(-1) + E_mu_mu.squeeze(-1)  # [N_edges,]
+
         E_mu = scatter_sum(
             src=E_edges_mu, index=receiver, dim=-1, dim_size=num_nodes
         )  # [N_nodes,]

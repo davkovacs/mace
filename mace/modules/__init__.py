@@ -6,6 +6,10 @@ from .blocks import (
     AgnosticNonlinearInteractionBlock,
     AgnosticResidualNonlinearInteractionBlock,
     AtomicEnergiesBlock,
+    E_Gauss_qq,
+    E_soft_mu_mu,
+    E_soft_q_mu,
+    ElectrostaticEnergyBlock,
     EquivariantProductBasisBlock,
     FixedChargeDipoleBlock,
     InteractionBlock,
@@ -19,10 +23,6 @@ from .blocks import (
     RealAgnosticResidualInteractionBlock,
     ResidualElementDependentInteractionBlock,
     ScaleShiftBlock,
-    E_Gauss_qq,
-    E_soft_q_mu,
-    E_soft_mu_mu,
-    ElectrostaticEnergyBlock,
 )
 from .loss import (
     DipoleSingleLoss,
@@ -37,6 +37,7 @@ from .models import (
     MACE,
     AtomicDipolesMACE,
     BOTNet,
+    ElectrostaticEnergyDipolesMACE,
     EnergyDipolesMACE,
     ScaleShiftBOTNet,
     ScaleShiftMACE,
@@ -92,6 +93,7 @@ __all__ = [
     "ScaleShiftBOTNet",
     "AtomicDipolesMACE",
     "EnergyDipolesMACE",
+    "ElectrostaticEnergyDipolesMACE",
     "EnergyForcesLoss",
     "WeightedEnergyForcesLoss",
     "WeightedForcesLoss",
@@ -107,5 +109,5 @@ __all__ = [
     "E_soft_q_mu",
     "E_soft_mu_mu",
     "ElectrostaticEnergyBlock",
-    "get_long_fully_connected_graph"
+    "get_long_fully_connected_graph",
 ]

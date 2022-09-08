@@ -15,6 +15,7 @@ from mace.tools.scatter import scatter_sum
 
 from .blocks import (
     AtomicEnergiesBlock,
+    ElectrostaticEnergyBlock,
     EquivariantProductBasisBlock,
     FixedChargeDipoleBlock,
     InteractionBlock,
@@ -25,14 +26,13 @@ from .blocks import (
     NonLinearReadoutBlock,
     RadialEmbeddingBlock,
     ScaleShiftBlock,
-    ElectrostaticEnergyBlock,
 )
 from .utils import (
     compute_forces,
     get_edge_vectors_and_lengths,
+    get_long_fully_connected_graph,
     get_outputs,
     get_symmetric_displacement,
-    get_long_fully_connected_graph,
 )
 
 
@@ -926,10 +926,10 @@ class EnergyDipolesMACE(torch.nn.Module):
 class ElectrostaticEnergyDipolesMACE(EnergyDipolesMACE):
     def __init__(
         self,
-        #atomic_inter_scale: float,
-        #atomic_inter_shift: float,
-        #dipole_scale: float,
-        #dipole_shift: float,
+        # atomic_inter_scale: float,
+        # atomic_inter_shift: float,
+        # dipole_scale: float,
+        # dipole_shift: float,
         qq_sigma: float,  # smearing of charges
         mu_lambda: float,  # smearing of dipoles 1
         mu_alpha: float,  # smearing of dipoles 2
@@ -943,8 +943,10 @@ class ElectrostaticEnergyDipolesMACE(EnergyDipolesMACE):
         # self.scale_shift_dipoles = ScaleShiftBlock(
         #     scale=dipole_scale, shift=dipole_shift
         # )
-        self.electrostactic_energy = ElectrostaticEnergyBlock(qq_sigma=qq_sigma, mu_lambda=mu_lambda, mu_alpha=mu_alpha)
-        self.atomic_dipoles_model = atomic_dipoles_model       
+        self.electrostactic_energy = ElectrostaticEnergyBlock(
+            qq_sigma=qq_sigma, mu_lambda=mu_lambda, mu_alpha=mu_alpha
+        )
+        self.atomic_dipoles_model = atomic_dipoles_model
 
     def forward(
         self,
@@ -1036,14 +1038,12 @@ class ElectrostaticEnergyDipolesMACE(EnergyDipolesMACE):
         )  # [n_nodes, ]
         E_q, E_mu = self.electrostactic_energy(
             atomic_dipoles=atomic_dipoles,
-            charge=data.charge,
+            charge=data.charges,
             positions=data.positions,
             edge_index_long_r=edge_index_long_r,
             num_nodes=num_nodes,
         )  # [n_nodes,]
-        node_inter_es_electro = (
-            node_inter_es + E_mu + E_q
-        )  # [n_nodes,]
+        node_inter_es_electro = node_inter_es + E_mu + E_q  # [n_nodes,]
 
         # comment out when implementing scale-shifting
         # node_inter_es_electro = (
@@ -1058,12 +1058,14 @@ class ElectrostaticEnergyDipolesMACE(EnergyDipolesMACE):
             dim=-1,
             dim_size=data.num_graphs,
         )  # [n_graphs,]
-        electrostatic_energy = scatter_sum(
+        electrostatic_energy = (
+            scatter_sum(
                 src=(E_mu + E_q),
                 index=data.batch,
                 dim=-1,
                 dim_size=data.num_graphs,
-                ),
+            ),
+        )
         total_energy = inter_e + e0  # [n_graphs,]
 
         forces, _, _ = get_outputs(
