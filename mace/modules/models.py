@@ -1058,14 +1058,12 @@ class ElectrostaticEnergyDipolesMACE(EnergyDipolesMACE):
             dim=-1,
             dim_size=data.num_graphs,
         )  # [n_graphs,]
-        electrostatic_energy = (
-            scatter_sum(
+        electrostatic_energy = scatter_sum(
                 src=(E_mu + E_q),
                 index=data.batch,
                 dim=-1,
                 dim_size=data.num_graphs,
-            ),
-        )
+            )
         total_energy = inter_e + e0  # [n_graphs,]
 
         forces, _, _ = get_outputs(

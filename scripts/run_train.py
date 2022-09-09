@@ -86,7 +86,7 @@ def main() -> None:
         args.compute_stress = False
     else:
         dipole_only = False
-        if args.model == "EnergyDipolesMACE":
+        if args.model == "EnergyDipolesMACE" or args.model == "ElectrostaticEnergyDipolesMACE":
             compute_dipole = True
             compute_energy = True
             args.compute_forces = True
@@ -299,6 +299,26 @@ def main() -> None:
                 "RealAgnosticInteractionBlock"
             ],
             MLP_irreps=o3.Irreps(args.MLP_irreps),
+        )
+    elif args.model == "ElectrostaticEnergyDipolesMACE":
+        # std_df = modules.scaling_classes["rms_dipoles_scaling"](train_loader)
+        assert (
+            args.loss == "energy_forces_dipole"
+        ), "Use energy_forces_dipole loss with ElectrostaticEnergyDipolesMACE model"
+        assert (
+            args.error_table == "EnergyDipoleRMSE"
+        ), "Use error_table EnergyDipoleRMSE with ElectrostaticEnergyDipolesMACE model"
+        model = modules.ElectrostaticEnergyDipolesMACE(
+            **model_config,
+            correlation=args.correlation,
+            gate=modules.gate_dict[args.gate],
+            interaction_cls_first=modules.interaction_classes[
+                "RealAgnosticInteractionBlock"
+            ],
+            MLP_irreps=o3.Irreps(args.MLP_irreps),
+            qq_sigma=args.qq_sigma,
+            mu_lambda=args.mu_lambda,
+            mu_alpha=args.mu_alpha,
         )
     else:
         raise RuntimeError(f"Unknown model: '{args.model}'")

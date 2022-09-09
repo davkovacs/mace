@@ -78,6 +78,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "ScaleShiftBOTNet",
             "AtomicDipolesMACE",
             "EnergyDipolesMACE",
+            "ElectrostaticEnergyDipolesMACE"
         ],
     )
     parser.add_argument(
@@ -396,6 +397,25 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         help="Gradient Clipping Value",
         type=check_float_or_none,
         default=10.0,
+    )
+    # electrostatic model parameters
+    parser.add_argument(
+        "--qq_sigma",
+        help="sigma smearing of charges",
+        type=float,
+        default=1.4,
+    )
+    parser.add_argument(
+        "--mu_lambda",
+        help="lambda smearing of dipoles, in the intervall 0-1",
+        type=float,
+        default=0.2,
+    )
+    parser.add_argument(
+        "--mu_alpha",
+        help="alpha smearing of dipoles",
+        type=float,
+        default=6.0,
     )
     return parser
 
