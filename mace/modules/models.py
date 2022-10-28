@@ -146,7 +146,7 @@ class MACE(torch.nn.Module):
         compute_force: bool = True,
         compute_virials: bool = False,
         compute_stress: bool = False,
-    ) -> Dict[str, Optional[torch.Tensor]]:
+    ) -> Dict[str, torch.Tensor]:
         # Setup
         data["positions"].requires_grad_(True)
         num_graphs = data["ptr"].numel() - 1
@@ -252,7 +252,7 @@ class ScaleShiftMACE(MACE):
         compute_force: bool = True,
         compute_virials: bool = False,
         compute_stress: bool = False,
-    ) -> Dict[str, Optional[torch.Tensor]]:
+    ) -> Dict[str, torch.Tensor]:
         # Setup
         data["positions"].requires_grad_(True)
         num_graphs = data["ptr"].numel() - 1
@@ -335,9 +335,9 @@ class ScaleShiftMACE(MACE):
 
         output = {
             "energy": total_energy,
-            "forces": forces,
-            "virials": virials,
-            "stress": stress,
+            "forces": forces if forces is not None else torch.zeros((len(data["positions"]), 3)),
+            "virials": virials if virials is not None else torch.tensor([0]),
+            "stress": stress if stress is not None else torch.tensor([0]),
         }
 
         return output
