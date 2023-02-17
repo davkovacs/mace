@@ -175,7 +175,7 @@ def main() -> None:
             shuffle=False,
             drop_last=False,
             num_workers=args.num_workers,
-            pin_memory=args.pin_memory)
+            pin_memory=args.pin_memory) 
 
     loss_fn: torch.nn.Module = get_loss_fn(
         args.loss,
@@ -552,6 +552,8 @@ def main() -> None:
         model.to(device)
         logging.info(f"Loaded model from epoch {epoch}")
 
+        for param in model.parameters():
+            param.requires_grad = False
         table = create_error_table(
             table_type=args.error_table,
             all_data_loaders=all_data_loaders,

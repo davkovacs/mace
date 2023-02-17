@@ -277,9 +277,10 @@ def create_error_table(
             "RMSE MU / mDebye / atom",
             "rel MU RMSE %",
         ]
-    
+
     for name in sorted(all_data_loaders, key=custom_key):
         data_loader = all_data_loaders[name]
+        data_loader.shuffle = False
         logging.info(f"Evaluating {name} ...")
         _, metrics = evaluate(
             model,
@@ -288,8 +289,6 @@ def create_error_table(
             output_args=output_args,
             device=device,
         )
-        del data_loader
-        torch.cuda.empty_cache()
         if log_wandb:
             wandb_log_dict = {
                 name
