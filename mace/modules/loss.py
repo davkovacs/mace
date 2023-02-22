@@ -247,3 +247,17 @@ class WeightedEnergyForcesDipoleLoss(torch.nn.Module):
             f"{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, "
             f"forces_weight={self.forces_weight:.3f}, dipole_weight={self.dipole_weight:.3f})"
         )
+
+class QM9_EnergyLoss(torch.nn.Module):
+    def __init__(self, ) -> None:
+        super().__init__()
+
+    def forward(self, ref: Batch, pred: TensorDict) -> torch.Tensor:
+        return weighted_mean_squared_error_energy(
+            ref, pred
+        ) * 10000  # multiply by 100 to have the right scale for the loss
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}"
+        )

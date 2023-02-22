@@ -186,6 +186,8 @@ def get_loss_fn(loss: str,
             forces_weight=forces_weight,
             dipole_weight=dipole_weight,
         )
+    elif loss == "qm9_energy":
+        loss_fn = modules.QM9_EnergyLoss()
     else:
         loss_fn = modules.EnergyForcesLoss(
             energy_weight=energy_weight, forces_weight=forces_weight

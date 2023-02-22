@@ -321,6 +321,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "stress",
             "dipole",
             "energy_forces_dipole",
+            "qm9_energy"
         ],
     )
     parser.add_argument(
