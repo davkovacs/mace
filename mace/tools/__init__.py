@@ -17,8 +17,10 @@ from .torch_tools import (
 from .train import SWAContainer, evaluate, train
 from .utils import (
     AtomicNumberTable,
+    AtomTypeTable,
     MetricsLogger,
     atomic_numbers_to_indices,
+    atom_types_to_indices,
     compute_c,
     compute_mae,
     compute_q95,
@@ -26,6 +28,7 @@ from .utils import (
     compute_rel_rmse,
     compute_rmse,
     get_atomic_number_table_from_zs,
+    get_atom_type_table,
     get_optimizer,
     get_tag,
     setup_logger,
@@ -34,7 +37,9 @@ from .utils import (
 __all__ = [
     "TensorDict",
     "AtomicNumberTable",
+    "AtomTypeTable",
     "atomic_numbers_to_indices",
+    "atom_types_to_indices",
     "to_numpy",
     "to_one_hot",
     "build_default_arg_parser",
@@ -46,6 +51,7 @@ __all__ = [
     "get_optimizer",
     "MetricsLogger",
     "get_atomic_number_table_from_zs",
+    "get_atom_type_table",
     "train",
     "evaluate",
     "SWAContainer",

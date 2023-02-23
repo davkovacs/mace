@@ -244,6 +244,18 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         required=False,
     )
     parser.add_argument(
+        "--use_atom_types",
+        help="Use atom types instead of atomic numbers",
+        type=bool,
+        default=False,
+    )
+    parser.add_argument(
+        "--atom_type_key",
+        help="Key of atom types in training xyz",
+        type=str,
+        default="atomtypes",
+    )
+    parser.add_argument(
         "--mean",
         help="Mean energy per atom of training set",
         type=float,

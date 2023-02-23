@@ -4,6 +4,7 @@ from .utils import (
     Configuration,
     Configurations,
     compute_average_E0s,
+    compute_average_E0s_at_type,
     config_from_atoms,
     config_from_atoms_list,
     load_from_xyz,
@@ -25,6 +26,7 @@ __all__ = [
     "config_from_atoms_list",
     "AtomicData",
     "compute_average_E0s",
+    "compute_average_E0s_at_type",
     "save_dataset_as_HDF5",
     "HDF5Dataset",
     "save_AtomicData_to_HDF5"

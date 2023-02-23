@@ -74,6 +74,7 @@ def main() -> None:
             virials_key=args.virials_key,
             dipole_key=args.dipole_key,
             charges_key=args.charges_key,
+            atom_type_key=args.atom_type_key,
         )
 
         logging.info(
@@ -89,7 +90,7 @@ def main() -> None:
     
     # Atomic number table
     # yapf: disable
-    if args.atomic_numbers is None:
+    if args.atomic_numbers and not args.use_atom_types:
         assert args.train_file.endswith(".xyz"), "Must specify atomic_numbers when using .h5 train_file input"
         z_table = tools.get_atomic_number_table_from_zs(
             z
@@ -97,17 +98,31 @@ def main() -> None:
             for config in configs
             for z in config.atomic_numbers
         )
+    elif args.use_atom_types:
+        logging.info("Using atom types from train_file")
+        at_type_table = tools.get_atom_type_table(
+            at
+            for configs in (collections.train, collections.valid)
+            for config in configs
+            for at in config.atom_types
+        )
+        logging.info(at_type_table)
+        z_table = None
     else:
         logging.info("Using atomic numbers from command line argument")
         zs_list = ast.literal_eval(args.atomic_numbers)
         assert isinstance(zs_list, list)
         z_table = tools.get_atomic_number_table_from_zs(zs_list)
     # yapf: enable
-    logging.info(z_table)
+    if z_table is not None:
+        logging.info(z_table)
 
     if atomic_energies_dict is None or len(atomic_energies_dict) == 0:
         if args.train_file.endswith(".xyz"):
-            atomic_energies_dict = get_atomic_energies(args.E0s, collections.train, z_table)
+            if not args.use_atom_types:
+                atomic_energies_dict = get_atomic_energies(args.E0s, collections.train, z_table)
+            else:
+                atomic_energies_dict = get_atomic_energies(args.E0s, collections.train, at_type_table)
         else:
             atomic_energies_dict = get_atomic_energies(args.E0s, None, z_table)
 
@@ -130,11 +145,19 @@ def main() -> None:
         else:
             compute_energy = True
             compute_dipole = False
-
-        atomic_energies: np.ndarray = np.array(
-            [atomic_energies_dict[z] for z in z_table.zs]
-        )
+        
+        if z_table is not None:
+            atomic_energies: np.ndarray = np.array(
+                [atomic_energies_dict[z] for z in z_table.zs]
+            )
+        elif at_type_table is not None:
+            atomic_energies: np.ndarray = np.array(
+                [atomic_energies_dict[at] for at in at_type_table.atom_types]
+            )
         logging.info(f"Atomic energies: {atomic_energies.tolist()}")
+
+    if z_table is None:
+        z_table = at_type_table
 
     if args.train_file.endswith(".xyz"):
         # TODO remove code duplication here
@@ -238,6 +261,7 @@ def main() -> None:
         avg_num_neighbors=args.avg_num_neighbors,
         atomic_numbers=z_table.zs,
     )
+
 
     model: torch.nn.Module
 

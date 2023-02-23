@@ -4,13 +4,15 @@
 # This program is distributed under the MIT License (see MIT.md)
 ###########################################################################################
 
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import torch.utils.data
 
 from mace.tools import (
     AtomicNumberTable,
+    AtomTypeTable,
     atomic_numbers_to_indices,
+    atom_types_to_indices,
     to_one_hot,
     torch_geometric,
     voigt_to_matrix,
@@ -108,12 +110,15 @@ class AtomicData(torch_geometric.data.Data):
 
     @classmethod
     def from_config(
-        cls, config: Configuration, z_table: AtomicNumberTable, cutoff: float
+        cls, config: Configuration, z_table: Union[AtomicNumberTable, AtomTypeTable], cutoff: float
     ) -> "AtomicData":
         edge_index, shifts, unit_shifts = get_neighborhood(
             positions=config.positions, cutoff=cutoff, pbc=config.pbc, cell=config.cell
         )
-        indices = atomic_numbers_to_indices(config.atomic_numbers, z_table=z_table)
+        if z_table.isinstance(AtomicNumberTable):
+            indices = atomic_numbers_to_indices(config.atomic_numbers, z_table=z_table)
+        elif z_table.isinstance(AtomTypeTable):
+            indices = atom_types_to_indices(config.atomic_numbers, at_table=z_table)
         one_hot = to_one_hot(
             torch.tensor(indices, dtype=torch.long).unsqueeze(-1),
             num_classes=len(z_table),

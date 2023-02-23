@@ -87,6 +87,22 @@ class AtomicNumberTable:
 
     def z_to_index(self, atomic_number: str) -> int:
         return self.zs.index(atomic_number)
+    
+class AtomTypeTable:
+    def __init__(self, ats: Sequence[str]):
+        self.ats = ats
+
+    def __len__(self) -> int:
+        return len(self.zs)
+
+    def __str__(self):
+        return f"AtomTypeTable: {tuple(s for s in self.zs)}"
+
+    def index_to_z(self, index: int) -> str:
+        return self.zs[index]
+
+    def at_to_index(self, atomic_number: str) -> int:
+        return self.ats.index(atomic_number)
 
 
 def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:
@@ -95,6 +111,12 @@ def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:
         z_set.add(z)
     return AtomicNumberTable(sorted(list(z_set)))
 
+def get_atom_type_table(at_types: Iterable[str]) -> AtomTypeTable:
+    at_set = set()
+    for at in at_types:
+        at_set.add(at)
+    return AtomTypeTable(sorted(list(at_set)))
+
 
 def atomic_numbers_to_indices(
     atomic_numbers: np.ndarray, z_table: AtomicNumberTable
@@ -102,6 +124,11 @@ def atomic_numbers_to_indices(
     to_index_fn = np.vectorize(z_table.z_to_index)
     return to_index_fn(atomic_numbers)
 
+def atom_types_to_indices(
+    atom_types: list, at_table: AtomTypeTable
+) -> np.ndarray:
+    to_index_fn = np.vectorize(at_table.at_to_index)
+    return to_index_fn(atom_types)
 
 def get_optimizer(
     name: str,

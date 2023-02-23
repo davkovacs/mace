@@ -15,7 +15,7 @@ from prettytable import PrettyTable
 
 from mace import data, modules
 from mace.data import AtomicData
-from mace.tools import AtomicNumberTable, evaluate, torch_geometric
+from mace.tools import AtomicNumberTable, AtomTypeTable, evaluate, torch_geometric
 
 
 @dataclasses.dataclass
@@ -38,6 +38,7 @@ def get_dataset_from_xyz(
     virials_key: str = "virials",
     dipole_key: str = "dipoles",
     charges_key: str = "charges",
+    atom_type_key: str = "atomtypes",
 ) -> Tuple[SubsetCollection, Optional[Dict[int, float]]]:
     """Load training and test dataset from xyz file"""
     atomic_energies_dict, all_train_configs = data.load_from_xyz(
@@ -49,6 +50,7 @@ def get_dataset_from_xyz(
         virials_key=virials_key,
         dipole_key=dipole_key,
         charges_key=charges_key,
+        atom_type_key=atom_type_key,
         extract_atomic_energies=True,
     )
     logging.info(
@@ -64,6 +66,7 @@ def get_dataset_from_xyz(
             virials_key=virials_key,
             dipole_key=dipole_key,
             charges_key=charges_key,
+            atom_type_key=atom_type_key,
             extract_atomic_energies=False,
         )
         logging.info(
@@ -125,9 +128,14 @@ def get_atomic_energies(E0s, train_collection, z_table)->dict:
             # catch if colections.train not defined above
             try:
                 assert train_collection is not None
-                atomic_energies_dict = data.compute_average_E0s(
-                    train_collection, z_table
-                )
+                if z_table.isinstance(AtomicNumberTable):
+                    atomic_energies_dict = data.compute_average_E0s(
+                        train_collection, z_table
+                    )
+                elif z_table.isinstance(AtomTypeTable):
+                    atomic_energies_dict = data.compute_average_E0s_at_type(
+                        train_collection, z_table
+                    )
             except Exception as e:
                 raise RuntimeError(
                     f"Could not compute average E0s if no training xyz given, error {e} occured"

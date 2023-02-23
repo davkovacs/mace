@@ -8,13 +8,13 @@ import logging
 import h5py
 from multiprocessing import Pool
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import ase.data
 import ase.io
 import numpy as np
 
-from mace.tools import AtomicNumberTable
+from mace.tools import AtomicNumberTable, AtomTypeTable
 
 Vector = np.ndarray  # [3,]
 Positions = np.ndarray  # [..., 3]
@@ -33,6 +33,7 @@ DEFAULT_CONFIG_TYPE_WEIGHTS = {DEFAULT_CONFIG_TYPE: 1.0}
 class Configuration:
     atomic_numbers: np.ndarray
     positions: Positions  # Angstrom
+    atom_types:Optional[list[str]] = None
     energy: Optional[float] = None  # eV
     forces: Optional[Forces] = None  # eV/Angstrom
     stress: Optional[Stress] = None  # eV/Angstrom^3
@@ -79,6 +80,7 @@ def config_from_atoms_list(
     virials_key="virials",
     dipole_key="dipole",
     charges_key="charges",
+    atom_type_key="atomtypes",
     config_type_weights: Dict[str, float] = None,
 ) -> Configurations:
     """Convert list of ase.Atoms into Configurations"""
@@ -96,6 +98,7 @@ def config_from_atoms_list(
                 virials_key=virials_key,
                 dipole_key=dipole_key,
                 charges_key=charges_key,
+                atom_type_key=atom_type_key,
                 config_type_weights=config_type_weights,
             )
         )
@@ -110,6 +113,7 @@ def config_from_atoms(
     virials_key="virials",
     dipole_key="dipole",
     charges_key="charges",
+    atom_type_key="atomtypes",
     config_type_weights: Dict[str, float] = None,
 ) -> Configuration:
     """Convert ase.Atoms to Configuration"""
@@ -123,6 +127,7 @@ def config_from_atoms(
     dipole = atoms.info.get(dipole_key, None)  # Debye
     # Charges default to 0 instead of None if not found
     charges = atoms.arrays.get(charges_key, np.zeros(len(atoms)))  # atomic unit
+    atom_types = atoms.arrays.get(atom_type_key, None)
     atomic_numbers = np.array(
         [ase.data.atomic_numbers[symbol] for symbol in atoms.symbols]
     )
@@ -157,6 +162,7 @@ def config_from_atoms(
     return Configuration(
         atomic_numbers=atomic_numbers,
         positions=atoms.get_positions(),
+        atom_types=atom_types,
         energy=energy,
         forces=forces,
         stress=stress,
@@ -199,6 +205,7 @@ def load_from_xyz(
     virials_key: str = "virials",
     dipole_key: str = "dipole",
     charges_key: str = "charges",
+    atom_type_key: str = "atomtypes",
     extract_atomic_energies: bool = False,
 ) -> Tuple[Dict[int, float], Configurations]:
     atoms_list = ase.io.read(file_path, index=":")
@@ -238,6 +245,7 @@ def load_from_xyz(
         virials_key=virials_key,
         dipole_key=dipole_key,
         charges_key=charges_key,
+        atom_type_key=atom_type_key,
     )
     return atomic_energies_dict, configs
 
@@ -270,6 +278,36 @@ def compute_average_E0s(
         for i, z in enumerate(z_table.zs):
             atomic_energies_dict[z] = 0.0
     return atomic_energies_dict
+
+def compute_average_E0s_at_type(
+    collections_train: Configurations, at_table: AtomTypeTable
+) -> Dict[str, float]:
+    """
+    Function to compute the average interaction energy of each atom type
+    returns dictionary of E0s
+    """
+    len_train = len(collections_train)
+    len_ats = len(at_table)
+    A = np.zeros((len_train, len_ats))
+    B = np.zeros(len_train)
+    for i in range(len_train):
+        B[i] = collections_train[i].energy
+        for j, z in enumerate(at_table.ats):
+            A[i, j] = np.count_nonzero(collections_train[i].atomic_numbers == z)
+    try:
+        E0s = np.linalg.lstsq(A, B, rcond=None)[0]
+        atomic_energies_dict = {}
+        for i, at in enumerate(at_table.ats):
+            atomic_energies_dict[at] = E0s[i]
+    except np.linalg.LinAlgError:
+        logging.warning(
+            "Failed to compute E0s using least squares regression, using the same for all atoms"
+        )
+        atomic_energies_dict = {}
+        for i, at in enumerate(at_table.ats):
+            atomic_energies_dict[at] = 0.0
+    return atomic_energies_dict
+
 
 def save_dataset_as_HDF5(
          dataset:List, out_name: str
