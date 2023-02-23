@@ -56,6 +56,7 @@ def main():
         config_type_weights = {"Default": 1.0}
 
     # Data preparation
+    logging.info("Loading dataset")
     collections, atomic_energies_dict = get_dataset_from_xyz(
         train_path=args.train_file,
         valid_path=args.valid_file,
