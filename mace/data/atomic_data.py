@@ -115,10 +115,10 @@ class AtomicData(torch_geometric.data.Data):
         edge_index, shifts, unit_shifts = get_neighborhood(
             positions=config.positions, cutoff=cutoff, pbc=config.pbc, cell=config.cell
         )
-        if z_table.isinstance(AtomicNumberTable):
+        if isinstance(z_table, AtomicNumberTable):
             indices = atomic_numbers_to_indices(config.atomic_numbers, z_table=z_table)
-        elif z_table.isinstance(AtomTypeTable):
-            indices = atom_types_to_indices(config.atomic_numbers, at_table=z_table)
+        elif isinstance(z_table, AtomTypeTable):
+            indices = atom_types_to_indices(config.atom_types, at_table=z_table)
         one_hot = to_one_hot(
             torch.tensor(indices, dtype=torch.long).unsqueeze(-1),
             num_classes=len(z_table),

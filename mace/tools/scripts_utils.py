@@ -128,11 +128,11 @@ def get_atomic_energies(E0s, train_collection, z_table)->dict:
             # catch if colections.train not defined above
             try:
                 assert train_collection is not None
-                if z_table.isinstance(AtomicNumberTable):
+                if isinstance(z_table, AtomicNumberTable):
                     atomic_energies_dict = data.compute_average_E0s(
                         train_collection, z_table
                     )
-                elif z_table.isinstance(AtomTypeTable):
+                elif isinstance(z_table, AtomTypeTable):
                     atomic_energies_dict = data.compute_average_E0s_at_type(
                         train_collection, z_table
                     )

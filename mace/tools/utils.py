@@ -93,16 +93,16 @@ class AtomTypeTable:
         self.ats = ats
 
     def __len__(self) -> int:
-        return len(self.zs)
+        return len(self.ats)
 
     def __str__(self):
-        return f"AtomTypeTable: {tuple(s for s in self.zs)}"
+        return f"AtomTypeTable: {tuple(s for s in self.ats)}"
 
     def index_to_z(self, index: int) -> str:
-        return self.zs[index]
+        return self.ats[index]
 
-    def at_to_index(self, atomic_number: str) -> int:
-        return self.ats.index(atomic_number)
+    def at_to_index(self, atom_type: str) -> int:
+        return self.ats.index(atom_type)
 
 
 def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:

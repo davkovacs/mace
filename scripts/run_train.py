@@ -90,7 +90,7 @@ def main() -> None:
     
     # Atomic number table
     # yapf: disable
-    if args.atomic_numbers and not args.use_atom_types:
+    if args.atomic_numbers is None:
         assert args.train_file.endswith(".xyz"), "Must specify atomic_numbers when using .h5 train_file input"
         z_table = tools.get_atomic_number_table_from_zs(
             z
@@ -98,7 +98,15 @@ def main() -> None:
             for config in configs
             for z in config.atomic_numbers
         )
-    elif args.use_atom_types:
+    else:
+        logging.info("Using atomic numbers from command line argument")
+        zs_list = ast.literal_eval(args.atomic_numbers)
+        assert isinstance(zs_list, list)
+        z_table = tools.get_atomic_number_table_from_zs(zs_list)
+    # yapf: enable
+    logging.info(z_table)
+    atomic_numbers = z_table.zs
+    if args.use_atom_types:
         logging.info("Using atom types from train_file")
         at_type_table = tools.get_atom_type_table(
             at
@@ -108,14 +116,6 @@ def main() -> None:
         )
         logging.info(at_type_table)
         z_table = None
-    else:
-        logging.info("Using atomic numbers from command line argument")
-        zs_list = ast.literal_eval(args.atomic_numbers)
-        assert isinstance(zs_list, list)
-        z_table = tools.get_atomic_number_table_from_zs(zs_list)
-    # yapf: enable
-    if z_table is not None:
-        logging.info(z_table)
 
     if atomic_energies_dict is None or len(atomic_energies_dict) == 0:
         if args.train_file.endswith(".xyz"):
@@ -152,7 +152,7 @@ def main() -> None:
             )
         elif at_type_table is not None:
             atomic_energies: np.ndarray = np.array(
-                [atomic_energies_dict[at] for at in at_type_table.atom_types]
+                [atomic_energies_dict[at] for at in at_type_table.ats]
             )
         logging.info(f"Atomic energies: {atomic_energies.tolist()}")
 
@@ -255,11 +255,11 @@ def main() -> None:
         max_ell=args.max_ell,
         interaction_cls=modules.interaction_classes[args.interaction],
         num_interactions=args.num_interactions,
-        num_elements=len(z_table),
+        num_elements=len(z_table), # for atom typed it is the number of atom types
         hidden_irreps=o3.Irreps(args.hidden_irreps),
         atomic_energies=atomic_energies,
         avg_num_neighbors=args.avg_num_neighbors,
-        atomic_numbers=z_table.zs,
+        atomic_numbers=atomic_numbers,
     )
 
 

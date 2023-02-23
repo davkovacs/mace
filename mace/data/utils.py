@@ -292,8 +292,8 @@ def compute_average_E0s_at_type(
     B = np.zeros(len_train)
     for i in range(len_train):
         B[i] = collections_train[i].energy
-        for j, z in enumerate(at_table.ats):
-            A[i, j] = np.count_nonzero(collections_train[i].atomic_numbers == z)
+        for j, at in enumerate(at_table.ats):
+            A[i, j] = np.count_nonzero(collections_train[i].atom_types == at)
     try:
         E0s = np.linalg.lstsq(A, B, rcond=None)[0]
         atomic_energies_dict = {}
