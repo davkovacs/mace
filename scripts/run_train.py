@@ -106,6 +106,7 @@ def main() -> None:
     # yapf: enable
     logging.info(z_table)
     atomic_numbers = z_table.zs
+    num_elements = len(z_table)
     if args.use_atom_types:
         logging.info("Using atom types from train_file")
         at_type_table = tools.get_atom_type_table(
@@ -114,8 +115,11 @@ def main() -> None:
             for config in configs
             for at in config.atom_types
         )
+        num_atom_types = len(at_type_table)
         logging.info(at_type_table)
         z_table = None
+    else:
+        num_atom_types = 0
 
     if atomic_energies_dict is None or len(atomic_energies_dict) == 0:
         if args.train_file.endswith(".xyz"):
@@ -255,7 +259,8 @@ def main() -> None:
         max_ell=args.max_ell,
         interaction_cls=modules.interaction_classes[args.interaction],
         num_interactions=args.num_interactions,
-        num_elements=len(z_table), # for atom typed it is the number of atom types
+        num_elements=num_elements,
+        num_atom_types=num_atom_types,
         hidden_irreps=o3.Irreps(args.hidden_irreps),
         atomic_energies=atomic_energies,
         avg_num_neighbors=args.avg_num_neighbors,

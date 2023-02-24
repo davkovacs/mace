@@ -47,6 +47,7 @@ class MACE(torch.nn.Module):
         interaction_cls_first: Type[InteractionBlock],
         num_interactions: int,
         num_elements: int,
+        num_atom_types: int,
         hidden_irreps: o3.Irreps,
         MLP_irreps: o3.Irreps,
         atomic_energies: np.ndarray,
@@ -54,6 +55,7 @@ class MACE(torch.nn.Module):
         atomic_numbers: List[int],
         correlation: int,
         gate: Optional[Callable],
+        # TODO add option here for atom_types
     ):
         super().__init__()
         self.register_buffer(
@@ -64,6 +66,9 @@ class MACE(torch.nn.Module):
             "num_interactions", torch.tensor(num_interactions, dtype=torch.int64)
         )
         # Embedding
+        self.num_atom_types = num_atom_types
+        if self.num_atom_types > 0:
+            self.embeddingMLP = torch.nn.Linear(num_atom_types, num_elements)
         node_attr_irreps = o3.Irreps([(num_elements, (0, 1))])
         node_feats_irreps = o3.Irreps([(hidden_irreps.count(o3.Irrep(0, 1)), (0, 1))])
         self.node_embedding = LinearNodeEmbeddingBlock(
@@ -185,6 +190,9 @@ class MACE(torch.nn.Module):
         )  # [n_graphs,]
 
         # Embeddings
+        # only do MLP on atom types here, to use at type dependent E0
+        if self.num_atom_types > 0:
+            data["node_attrs"] = self.embeddingMLP(data["node_attrs"])
         node_feats = self.node_embedding(data["node_attrs"])
         vectors, lengths = get_edge_vectors_and_lengths(
             positions=data["positions"],
@@ -298,6 +306,9 @@ class ScaleShiftMACE(MACE):
         )  # [n_graphs,]
 
         # Embeddings
+        # only do MLP on atom types here, to use at type dependent E0
+        if self.num_atom_types > 0:
+            data["node_attrs"] = self.embeddingMLP(data["node_attrs"])
         node_feats = self.node_embedding(data["node_attrs"])
         vectors, lengths = get_edge_vectors_and_lengths(
             positions=data["positions"],

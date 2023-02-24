@@ -246,7 +246,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--use_atom_types",
         help="Use atom types instead of atomic numbers",
-        type=bool,
+        action="store_true",
         default=False,
     )
     parser.add_argument(
