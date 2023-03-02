@@ -260,7 +260,6 @@ def main() -> None:
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=0.0,
-            radial_MLP=ast.literal_eval(args.radial_MLP),
 
         )
     elif args.model == "ScaleShiftMACE":
@@ -272,7 +271,6 @@ def main() -> None:
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=args.mean,
-            radial_MLP=ast.literal_eval(args.radial_MLP),
         )
     elif args.model == "ScaleShiftBOTNet":
         model = modules.ScaleShiftBOTNet(
