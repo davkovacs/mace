@@ -209,7 +209,7 @@ class InteractionBlock(torch.nn.Module):
         target_irreps: o3.Irreps,
         hidden_irreps: o3.Irreps,
         avg_num_neighbors: float,
-        radial_MLP: list[int] = [64, 64, 64],
+        radial_MLP: Optional[list[int]] = None,
     ) -> None:
         super().__init__()
         self.node_attrs_irreps = node_attrs_irreps
@@ -219,6 +219,8 @@ class InteractionBlock(torch.nn.Module):
         self.target_irreps = target_irreps
         self.hidden_irreps = hidden_irreps
         self.avg_num_neighbors = avg_num_neighbors
+        if radial_MLP is None:
+            radial_MLP = [64, 64, 64]
         self.radial_MLP = radial_MLP
 
         self._setup()

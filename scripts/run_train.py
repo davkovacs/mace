@@ -5,6 +5,7 @@
 ###########################################################################################
 
 import ast
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -259,6 +260,8 @@ def main() -> None:
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=0.0,
+            radial_MLP=ast.literal_eval(args.radial_MLP),
+
         )
     elif args.model == "ScaleShiftMACE":
         model = modules.ScaleShiftMACE(
@@ -269,6 +272,7 @@ def main() -> None:
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=args.mean,
+            radial_MLP=ast.literal_eval(args.radial_MLP),
         )
     elif args.model == "ScaleShiftBOTNet":
         model = modules.ScaleShiftBOTNet(
@@ -454,7 +458,7 @@ def main() -> None:
                 swa=True,
                 device=device,
             )
-        except:
+        except Exception as e:
             opt_start_epoch = checkpoint_handler.load_latest(
                 state=tools.CheckpointState(model, optimizer, lr_scheduler),
                 swa=False,
@@ -474,6 +478,7 @@ def main() -> None:
     if args.wandb:
         logging.info("Using Weights and Biases for logging")
         import wandb
+
         wandb_config = {}
         args_dict = vars(args)
         args_dict_json = json.dumps(args_dict)
