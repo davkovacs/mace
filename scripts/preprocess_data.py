@@ -86,6 +86,10 @@ def main():
         assert isinstance(zs_list, list)
         z_table = tools.get_atomic_number_table_from_zs(zs_list)
 
+    if len(collections.train) > 900000:
+        # change h5py group creation for large dataset
+        h5py.get_config().track_order = True
+
     logging.info("Preparing training set")
     if args.shuffle:
         random.shuffle(collections.train)
