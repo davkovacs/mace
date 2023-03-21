@@ -12,7 +12,7 @@ from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 from mace.data import AtomicData
-from mace.tools.scatter import scatter_sum
+from mace.tools.scatter import scatter_sum, scatter_mean, scatter_std
 
 from .blocks import (
     AtomicEnergiesBlock,
@@ -25,6 +25,8 @@ from .blocks import (
     NonLinearReadoutBlock,
     RadialEmbeddingBlock,
     ScaleShiftBlock,
+    LinearReadoutBlock_2,
+    NonLinearReadoutBlock_2
 )
 from .utils import (
     compute_fixed_charge_dipole,
@@ -55,6 +57,7 @@ class MACE(torch.nn.Module):
         correlation: int,
         gate: Optional[Callable],
         radial_MLP: Optional[list[int]] = None,
+        intensive_output: bool = False,
     ):
         super().__init__()
         self.register_buffer(
@@ -116,7 +119,12 @@ class MACE(torch.nn.Module):
         self.products = torch.nn.ModuleList([prod])
 
         self.readouts = torch.nn.ModuleList()
-        self.readouts.append(LinearReadoutBlock(hidden_irreps))
+
+        self.intensive_output = intensive_output
+        if intensive_output:
+            self.readouts.append(LinearReadoutBlock_2(hidden_irreps, MLP_irreps))
+        else:
+            self.readouts.append(LinearReadoutBlock(hidden_irreps))
 
         for i in range(num_interactions - 1):
             if i == num_interactions - 2:
@@ -145,11 +153,42 @@ class MACE(torch.nn.Module):
             )
             self.products.append(prod)
             if i == num_interactions - 2:
-                self.readouts.append(
-                    NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate)
-                )
+                if self.intensive_output:
+                    self.readouts.append(
+                        NonLinearReadoutBlock_2(hidden_irreps_out, MLP_irreps, MLP_irreps, gate)
+                    )
+                else:
+                    self.readouts.append(
+                        NonLinearReadoutBlock(hidden_irreps_out, MLP_irreps, gate)
+                    )
             else:
-                self.readouts.append(LinearReadoutBlock(hidden_irreps))
+                if self.intensive_output:
+                    self.readouts.append(
+                        LinearReadoutBlock_2(hidden_irreps, MLP_irreps))
+                else:
+                    self.readouts.append(LinearReadoutBlock(hidden_irreps))
+
+        # final fully connected layer
+        if self.intensive_output:
+            input_dim = self.readouts[0].irreps_out.num_irreps
+
+            self.mom_mapper = torch.nn.Sequential(
+                torch.nn.Linear(3, 1),
+                torch.nn.GELU(),
+                torch.nn.Dropout(0.0),
+            )
+
+            mid_dim = MLP_irreps.num_irreps
+            self.mom_attn = torch.nn.MultiheadAttention(
+                input_dim, 8, 0.05, batch_first=True
+            )
+
+            self.fc = torch.nn.Sequential(
+                torch.nn.Linear(input_dim, mid_dim),
+                torch.nn.GELU(),
+                torch.nn.Dropout(0.0),
+                torch.nn.Linear(mid_dim, 1),
+            )
 
     def forward(
         self,
@@ -223,6 +262,7 @@ class MACE(torch.nn.Module):
             )  # [n_graphs,]
             energies.append(energy)
             node_energies_list.append(node_energies)
+
 
         # Sum over energy contributions
         contributions = torch.stack(energies, dim=-1)
@@ -338,9 +378,41 @@ class ScaleShiftMACE(MACE):
         node_inter_es = self.scale_shift(node_inter_es)
 
         # Sum over nodes in graph
-        inter_e = scatter_sum(
-            src=node_inter_es, index=data["batch"], dim=-1, dim_size=num_graphs
-        )  # [n_graphs,]
+        if not self.intensive_output:
+            inter_e = scatter_sum(
+                src=node_inter_es, index=data["batch"], dim=-1, dim_size=num_graphs
+            )  # [n_graphs,]
+        else:
+            inter_e = scatter_mean(
+                src=node_inter_es,
+                index=data["batch"].unsqueeze(-1),
+                dim=0,
+                dim_size=num_graphs,
+            )  # [n_graphs,16]
+            inter_std = scatter_std(
+                src=node_inter_es,
+                index=data["batch"].unsqueeze(-1),
+                dim=0,
+                dim_size=num_graphs,
+            )  # [n_graphs,16]
+            inter_sum = scatter_sum(
+                src=node_inter_es,
+                index=data["batch"].unsqueeze(-1),
+                dim=0,
+                dim_size=num_graphs,
+            )  # [n_graphs,16]
+
+            inter_e = inter_e[:, :, None]
+            inter_std = inter_std[:, :, None]
+            inter_sum = inter_sum[:, :, None]
+
+            momentums = self.mom_mapper(torch.cat([inter_e, inter_std, inter_sum], dim=2))
+            momentums = momentums.reshape(momentums.shape[0], 1, momentums.shape[1])
+            att_momentums, _ = self.mom_attn(momentums, momentums, momentums)
+            momentums = momentums + att_momentums
+            momentums = momentums[:, 0, :]
+            inter_e = self.fc(momentums).squeeze(-1)
+            node_inter_es = node_inter_es.sum(dim=1, keepdim=True).squeeze(-1)
 
         # Add E_0 and (scaled) interaction energy
         total_energy = e0 + inter_e

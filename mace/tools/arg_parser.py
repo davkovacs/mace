@@ -136,6 +136,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         default="16x0e",
     )
     parser.add_argument(
+        "--intensive_output",
+        help="output intensive properties",
+        type=bool,
+        default=False,
+    )
+    parser.add_argument(
         "--radial_MLP",
         help="width of the radial MLP",
         type=str,

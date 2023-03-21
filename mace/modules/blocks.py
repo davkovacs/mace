@@ -44,6 +44,34 @@ class LinearReadoutBlock(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # [n_nodes, irreps]  # [..., ]
         return self.linear(x)  # [n_nodes, 1]
+    
+@compile_mode("script")
+class LinearReadoutBlock_2(torch.nn.Module):
+    def __init__(self, irreps_in: o3.Irreps, irreps_out: o3.Irreps):
+        super().__init__()
+        self.linear = o3.Linear(irreps_in=irreps_in, irreps_out=irreps_out)
+        self.irreps_out = irreps_out
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # [n_nodes, irreps]  # [..., ]
+        return self.linear(x)  # [n_nodes, 1]
+    
+@compile_mode("script")
+class NonLinearReadoutBlock_2(torch.nn.Module):
+    def __init__(
+        self, irreps_in: o3.Irreps, irreps_out: o3.Irreps, MLP_irreps: o3.Irreps, gate: Optional[Callable]
+    ):
+        super().__init__()
+        self.hidden_irreps = MLP_irreps
+        self.irreps_out = irreps_out
+        self.linear_1 = o3.Linear(irreps_in=irreps_in, irreps_out=self.hidden_irreps)
+        self.non_linearity = nn.Activation(irreps_in=self.hidden_irreps, acts=[gate])
+        self.linear_2 = o3.Linear(
+            irreps_in=self.hidden_irreps, irreps_out=irreps_out
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # [n_nodes, irreps]  # [..., ]
+        x = self.non_linearity(self.linear_1(x))
+        return self.linear_2(x)  # [n_nodes, 1]
 
 
 @compile_mode("script")

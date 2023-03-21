@@ -239,12 +239,17 @@ def main() -> None:
         avg_num_neighbors=args.avg_num_neighbors,
         atomic_numbers=z_table.zs,
         radial_MLP=ast.literal_eval(args.radial_MLP),
+        intensive_output=args.intensive_output,
     )
 
     model: torch.nn.Module
 
     if args.scaling == "no_scaling":
         args.std = 1.0
+        if args.intensive_output:
+            args.mean = 0.0
+        else:
+            args.mean, _ = modules.scaling_classes["rms_forces_scaling"](train_loader, atomic_energies)
         logging.info("No scaling selected")
     elif args.mean is None or args.std is None:
         args.mean, args.std = modules.scaling_classes[args.scaling](train_loader, atomic_energies)
