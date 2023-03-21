@@ -32,8 +32,14 @@ class MACECalculator(Calculator):
     ):
         Calculator.__init__(self, **kwargs)
         self.results = {}
-
-        self.model = torch.load(f=model_path, map_location=device)
+        
+        try:
+            self.model = torch.load(f=model_path).to(device)
+        except RuntimeError:
+            try:
+                self.model = torch.load(f=model_path, map_location=torch.device('cpu')).to(device)
+            except RuntimeError:
+                self.model = torch.load(f=model_path, map_location=torch.device(device))
         self.r_max = float(self.model.r_max)
         self.device = torch_tools.init_device(device)
         self.energy_units_to_eV = energy_units_to_eV

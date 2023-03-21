@@ -25,7 +25,12 @@ def compute_statistics(train_loader: torch.utils.data.DataLoader,
     Compute the average number of neighbors and the mean energy and standard
     deviation of the force components"""
     avg_num_neighbors = compute_avg_num_neighbors(train_loader)
-    mean, std = scaling_classes[scaling](train_loader, atomic_energies)
+    if scaling == "no_scaling":
+        std = 1.0
+        mean = 0.0
+        logging.info("No scaling selected")
+    else:
+        mean, std = scaling_classes[scaling](train_loader, atomic_energies)
     return avg_num_neighbors, mean, std
 
 def main():

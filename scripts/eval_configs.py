@@ -62,7 +62,13 @@ def main():
     device = torch_tools.init_device(args.device)
 
     # Load model
-    model = torch.load(f=args.model, map_location=args.device)
+    try:
+        model = torch.load(f=args.model).to(device)
+    except RuntimeError:
+        try:
+            model = torch.load(f=args.model, map_location=torch.device('cpu')).to(device)
+        except RuntimeError:
+            model = torch.load(f=args.model, map_location=torch.device(device))
 
     for param in model.parameters():
         param.requires_grad = False
