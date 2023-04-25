@@ -576,7 +576,9 @@ def main() -> None:
         )
         model.to(device)
         logging.info(f"Loaded model from epoch {epoch}")
-
+        
+        for param in model.parameters():
+            param.requires_grad = False
         table = create_error_table(
             table_type=args.error_table,
             all_data_loaders=all_data_loaders,

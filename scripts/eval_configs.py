@@ -80,6 +80,7 @@ def main():
 
     # Load model
     model = torch.load(f=args.model, map_location=args.device)
+    model.to(args.device)
 
     # Load data and prepare input
     atoms_list = ase.io.read(args.configs, index=":")
