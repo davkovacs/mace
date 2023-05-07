@@ -312,7 +312,7 @@ def create_error_table(
             table.add_row(
                 [
                     name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:.1f}",
+                    f"{metrics['rmse_e_per_atom'] * 1000:.3f}",
                     f"{metrics['rmse_f'] * 1000:.1f}",
                     f"{metrics['rel_rmse_f']:.2f}",
                 ]
@@ -324,7 +324,7 @@ def create_error_table(
             table.add_row(
                 [
                     name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:.1f}",
+                    f"{metrics['rmse_e_per_atom'] * 1000:.3f}",
                     f"{metrics['rmse_f'] * 1000:.1f}",
                     f"{metrics['rel_rmse_f']:.2f}",
                     f"{metrics['rmse_stress'] * 1000:.1f}",
@@ -337,7 +337,7 @@ def create_error_table(
             table.add_row(
                 [
                     name,
-                    f"{metrics['rmse_e_per_atom'] * 1000:.1f}",
+                    f"{metrics['rmse_e_per_atom'] * 1000:.3f}",
                     f"{metrics['rmse_f'] * 1000:.1f}",
                     f"{metrics['rel_rmse_f']:.2f}",
                     f"{metrics['rmse_virials'] * 1000:.1f}",
@@ -347,7 +347,7 @@ def create_error_table(
             table.add_row(
                 [
                     name,
-                    f"{metrics['mae_e'] * 1000:.1f}",
+                    f"{metrics['mae_e'] * 1000:.3f}",
                     f"{metrics['mae_f'] * 1000:.1f}",
                     f"{metrics['rel_mae_f']:.2f}",
                 ]
@@ -356,7 +356,7 @@ def create_error_table(
             table.add_row(
                 [
                     name,
-                    f"{metrics['mae_e_per_atom'] * 1000:.1f}",
+                    f"{metrics['mae_e_per_atom'] * 1000:.3f}",
                     f"{metrics['mae_f'] * 1000:.1f}",
                     f"{metrics['rel_mae_f']:.2f}",
                 ]
