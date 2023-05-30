@@ -61,7 +61,8 @@ def main() -> None:
         args.std = statistics["std"]
         args.avg_num_neighbors = statistics["avg_num_neighbors"]
         args.compute_avg_num_neighbors = False
-        args.E0s = statistics["atomic_energies"]
+        if not (args.E0s is not None and args.fine_tune):
+            args.E0s = statistics["atomic_energies"]
 
     # Data preparation
     if args.train_file.endswith(".xyz"):
@@ -490,6 +491,40 @@ def main() -> None:
     if args.ema:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema_decay)
 
+    if args.fine_tune is not None:
+        tune_groups = ast.literal_eval(args.fine_tune)
+        logging.info(f"Fine tuning")
+        assert isinstance(tune_groups, list)
+        for name, param in model.named_parameters():
+            if any([group in name for group in tune_groups]):
+                param.requires_grad = True
+                logging.info(f"Fine tuning {name}")
+            else:
+                param.requires_grad = False
+
+        param_options_fine_tune = dict(
+            params=[group for group in param_options["params"] if group['name'] in tune_groups],
+        lr=args.lr,
+        amsgrad=args.amsgrad,
+        )
+        optimizer = torch.optim.Adam(
+            **param_options_fine_tune
+        )
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            factor=args.lr_factor,
+            patience=args.scheduler_patience,
+        )
+        if args.E0s is not None:
+            logging.info("Setting E0s for fine tuning from command line")
+            atomic_energies_dict = ast.literal_eval(args.E0s)
+            atomic_energies = torch.tensor(
+                [atomic_energies_dict[z] for z in z_table.zs], device=device
+            )
+            logging.info(f"Atomic energies: {atomic_energies}")
+            model.atomic_energies_fn = modules.blocks.AtomicEnergiesBlock(atomic_energies)
+        
+    model.to(device)
     logging.info(model)
     logging.info(f"Number of parameters: {tools.count_parameters(model)}")
     logging.info(f"Optimizer: {optimizer}")

@@ -38,8 +38,14 @@ class CheckpointBuilder:
         state: CheckpointState, checkpoint: Checkpoint, strict: bool
     ) -> None:
         state.model.load_state_dict(checkpoint["model"], strict=strict)  # type: ignore
-        state.optimizer.load_state_dict(checkpoint["optimizer"])
-        state.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        try:
+            state.optimizer.load_state_dict(checkpoint["optimizer"])
+            state.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        except ValueError:
+            logging.warning(
+                "Could not load optimizer and lr_scheduler from checkpoint. "
+                "This is expected if fine tuning a model."
+            )
 
 
 @dataclasses.dataclass

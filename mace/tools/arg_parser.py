@@ -475,6 +475,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
         type=check_float_or_none,
         default=10.0,
     )
+    parser.add_argument(
+        "--fine_tune",
+        help="Fine tune part of the model",
+        default=None,
+        type=str,
+    )
     # options for using Weights and Biases for experiment tracking
     # to install see https://wandb.ai
     parser.add_argument(
